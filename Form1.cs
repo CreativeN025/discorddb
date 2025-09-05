@@ -23,8 +23,7 @@ namespace discorddb
         private async void BT_Confirm_Click(object sender, EventArgs e)
         {
             Debug.WriteLine(TB_SelectedFolder.Text);
-            pB_transfer.Enabled = true;
-
+           
             SQLiteCommand command = DatabaseHelper.ConnectToDatabase(DatabaseHelper.getConnectionString());
             StringBuilder sB = new StringBuilder();
 
@@ -66,7 +65,12 @@ namespace discorddb
                     command.Parameters.AddWithValue($"@Attachments{i}", contentItem.Attachments);
                     sB.Clear();
                     #endregion
+                    if (i % (Math.Max(saveinterval/10,1)) == 0)
+                    {
+                        percentage = Convert.ToInt32(double.Floor(((double)i / (double)contentlength) * 100));
+                        pB_transfer.Value = percentage;
 
+                    }
                     if (i % saveinterval == 0 && i != 0 || i == contentlength)
                     {
                         percentage = Convert.ToInt32(double.Floor(((double)i / (double)contentlength) * 100));
@@ -78,7 +82,8 @@ namespace discorddb
                     i++;
                 }
                 savedata(command);
-                Console.Beep();
+                pB_total.Value = Convert.ToInt32(double.Floor(((double)j / (double)directories.Length)*100));
+                if(cB_sound.Checked) Console.Beep();
 
             }
         }

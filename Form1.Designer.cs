@@ -39,6 +39,8 @@ namespace discorddb
             label1 = new Label();
             pB_transfer = new ProgressBar();
             label2 = new Label();
+            pB_total = new ProgressBar();
+            cB_sound = new CheckBox();
             SuspendLayout();
             // 
             // folderBrowserDialog1
@@ -86,19 +88,36 @@ namespace discorddb
             // 
             // pB_transfer
             // 
-            pB_transfer.Location = new Point(208, 102);
+            pB_transfer.Location = new Point(216, 138);
             pB_transfer.Name = "pB_transfer";
-            pB_transfer.Size = new Size(370, 29);
+            pB_transfer.Size = new Size(329, 20);
             pB_transfer.TabIndex = 4;
             // 
             // label2
             // 
             label2.AutoSize = true;
-            label2.Location = new Point(106, 111);
+            label2.Location = new Point(65, 94);
             label2.Name = "label2";
             label2.Size = new Size(87, 20);
             label2.TabIndex = 5;
             label2.Text = "Progressbar";
+            // 
+            // pB_total
+            // 
+            pB_total.Location = new Point(175, 85);
+            pB_total.Name = "pB_total";
+            pB_total.Size = new Size(394, 29);
+            pB_total.TabIndex = 6;
+            // 
+            // cB_sound
+            // 
+            cB_sound.AutoSize = true;
+            cB_sound.Location = new Point(603, 87);
+            cB_sound.Name = "cB_sound";
+            cB_sound.Size = new Size(109, 24);
+            cB_sound.TabIndex = 7;
+            cB_sound.Text = "Beep sound";
+            cB_sound.UseVisualStyleBackColor = true;
             // 
             // Form1
             // 
@@ -106,6 +125,8 @@ namespace discorddb
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = SystemColors.Control;
             ClientSize = new Size(800, 450);
+            Controls.Add(cB_sound);
+            Controls.Add(pB_total);
             Controls.Add(label2);
             Controls.Add(pB_transfer);
             Controls.Add(label1);
@@ -127,5 +148,7 @@ namespace discorddb
         private Label label1;
         private ProgressBar pB_transfer;
         private Label label2;
+        private ProgressBar pB_total;
+        private CheckBox cB_sound;
     }
 }
