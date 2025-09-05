@@ -2,8 +2,11 @@ using Microsoft.VisualBasic;
 using System;
 using System.Data.SQLite;
 using System.Diagnostics;
+using System.DirectoryServices.ActiveDirectory;
 using System.Linq;
+using System.Media;
 using System.Reflection.Metadata;
+using System.Text;
 using System.Text.Json;
 
 namespace discorddb
@@ -14,64 +17,89 @@ namespace discorddb
         {
             InitializeComponent();
         }
-        
-        
-        
+
+
+
         private async void BT_Confirm_Click(object sender, EventArgs e)
         {
             Debug.WriteLine(TB_SelectedFolder.Text);
             pB_transfer.Enabled = true;
 
             SQLiteCommand command = DatabaseHelper.ConnectToDatabase(DatabaseHelper.getConnectionString());
-            List<MessageContent> content = readjson(TB_SelectedFolder.Text);
-            int i = 1;
+            StringBuilder sB = new StringBuilder();
+
+            int i = 0;
             int percentage = 0;
-            int saveinterval = 0;
-            foreach (MessageContent contentItem in content)
+            string[] directories = Directory.GetDirectories(TB_SelectedFolder.Text);
+            for (int j = 0; j < directories.Length; j++)
             {
-                createinitialstring(command);
-                string add = "";
-                //Create add string (id,content,date,channelId,attachments)
 
-                saveinterval = Math.Max(1, content.Count / 10);
-                add += $"(@Id{i}, @Content{i}, @Date{i}, @ChannelId{i},@ChannelType{i}, @Attachments{i})";
-                if (i == content.Count -1 || (i % saveinterval == 0 && i != 0))
+
+                List<MessageContent> content = readjson(directories[j]);
+                int contentlength = content.Count;
+                int saveinterval = content.Count > 5000 ? content.Count / 10 : content.Count;
+                //string add = "";
+                command.CommandText = "";
+                i = 1;
+                foreach (MessageContent contentItem in content)
                 {
-                    add += ";";
+                    if (command.CommandText == "")
+                    {
+                        createinitialstring(command);
+                    }
+                    //Create add string (id,content,date,channelId,attachments)
+
+                    sB.Append($"(@Id{i}, @Content{i}, @Date{i}, @ChannelId{i},@ChannelType{i}, @Attachments{i})");
+                    if (i % saveinterval == 0 && i != 0)
+                    {
+                        sB.Append(";");
+                    }
+                    else { sB.Append(","); }
+
+                    #region
+                    command.CommandText += sB.ToString();
+                    command.Parameters.AddWithValue($"@Id{i}", contentItem.Id);
+                    command.Parameters.AddWithValue($"@Content{i}", contentItem.Content);
+                    command.Parameters.AddWithValue($"@Date{i}", contentItem.Date);
+                    command.Parameters.AddWithValue($"@ChannelId{i}", contentItem.ChannelId);
+                    command.Parameters.AddWithValue($"@ChannelType{i}", contentItem.ChannelType);
+                    command.Parameters.AddWithValue($"@Attachments{i}", contentItem.Attachments);
+                    sB.Clear();
+                    #endregion
+
+                    if (i % saveinterval == 0 && i != 0 || i == contentlength)
+                    {
+                        percentage = Convert.ToInt32(double.Floor(((double)i / (double)contentlength) * 100));
+                        //Debug.WriteLine($"{i} / {contentlength} = {percentage}");
+                        pB_transfer.Value = percentage;
+
+                        savedata(command);
+                    }
+                    i++;
                 }
-                else { add += ","; }
-              addvalues(command, contentItem,add,i);
-                if (i % saveinterval == 0 && i!=0)
-                {
-                    percentage = Convert.ToInt32(double.Floor(((double)i / (double)content.Count) * 100));
-                    Debug.WriteLine($"{i} / {content.Count} = {percentage}");
-                    pB_transfer.Value = percentage;
-             
-                    savedata(command);
-                    command.CommandText="";
-                }
-                i++;
+                savedata(command);
+                Console.Beep();
+
             }
-            savedata(command);
         }
-        private void addvalues(SQLiteCommand command,MessageContent contentItem,string add,int i)
-        {
-            command.CommandText += add;
-            command.Parameters.AddWithValue($"@Id{i}", contentItem.Id);
-            command.Parameters.AddWithValue($"@Content{i}", contentItem.Content);
-            command.Parameters.AddWithValue($"@Date{i}", contentItem.Date);
-            command.Parameters.AddWithValue($"@ChannelId{i}", contentItem.ChannelId);
-            command.Parameters.AddWithValue($"@ChannelType{i}", contentItem.ChannelType);
 
-            command.Parameters.AddWithValue($"@Attachments{i}", contentItem.Attachments);
-        }
         private void savedata(SQLiteCommand command)
         {
-            if(command.CommandText == "") { return; }
+            if (command.CommandText.TrimEnd().EndsWith(',') == true)
+            {
+                command.CommandText = command.CommandText.TrimEnd(',') + ";";
+            }
+            if (command.CommandText == "" || command.CommandText == "INSERT INTO Message (Id,Content,Date,ChannelId,ChannelType,Attachments)  \r\n                VALUES")
+            { return; }
+
             //Debug.WriteLine(command.CommandText);
-            Clipboard.SetText(command.CommandText);
+            //Clipboard.SetText(command.CommandText);
+            command.Prepare();
+            
             DatabaseHelper.UpdateDatabase(command);
+            command.CommandText = "";
         }
+
         private void createinitialstring(SQLiteCommand command)
         {
             command.CommandText = $@"
