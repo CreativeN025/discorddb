@@ -5,7 +5,7 @@ using System.Reflection.Metadata;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace discorddb
+namespace discorddb.Objects
 {
     public class MessageContent
     {
@@ -14,6 +14,6 @@ namespace discorddb
         public DateTime Date { get; set; }
         public string ChannelId { get; set; }
         public string ChannelType { get; set; }
-        public string Attachments { get; set; }  
+        public string Attachments { get; set; }
     }
 }

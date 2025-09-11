@@ -5,24 +5,30 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
+using System.Diagnostics;
+using System.Net.NetworkInformation;
+using System.Text;
 namespace discorddb
 {
 
     public static class DatabaseHelper
     {
         private static string connectionString = @"Data Source=..\..\Files\discorddb.db; Version=3";
+        private static string filestring = @"..\..\Files\discorddb.db";
         public static void InitialiseDatabase()
         {
-            SQLiteConnection.CreateFile(@"..\..\Files\discorddb.db");
-
-            using(var connection = new SQLiteConnection(connectionString))
+            if (!File.Exists(filestring))
             {
-                connection.Open();
-                
-                using (var command = new SQLiteCommand(connection))
+                SQLiteConnection.CreateFile(filestring);
+
+                using (var connection = new SQLiteConnection(connectionString))
                 {
-                    //new code
-                    command.CommandText = @"
+                    connection.Open();
+
+                    using (var command = new SQLiteCommand(connection))
+                    {
+                        //new code
+                        command.CommandText = @"
                  CREATE TABLE IF NOT EXISTS Message(
                         Id INTEGER PRIMARY KEY,
                         Content TEXT,
@@ -32,10 +38,11 @@ namespace discorddb
                         Attachments TEXT
                      );";
 
-                    command.ExecuteNonQuery();
+                        command.ExecuteNonQuery();
+                    }
                 }
             }
-            
+
         }
         public static string getConnectionString()
         {
@@ -43,15 +50,15 @@ namespace discorddb
         }
         public static void UpdateDatabase(SQLiteCommand command)
         {
-            
-            command.ExecuteNonQuery();  
+            command.ExecuteNonQuery();
         }
-        public static SQLiteCommand ConnectToDatabase(string pConnectionString) 
+        public static SQLiteCommand ConnectToDatabase(string pConnectionString)
         {
             var connection = new SQLiteConnection(pConnectionString);
             connection.Open();
             return new SQLiteCommand(connection);
 
         }
+
     }
 }

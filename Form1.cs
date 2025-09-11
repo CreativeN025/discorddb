@@ -1,8 +1,10 @@
+using discorddb.Objects;
 using Microsoft.VisualBasic;
 using System;
 using System.Data.SQLite;
 using System.Diagnostics;
 using System.DirectoryServices.ActiveDirectory;
+using System.IO;
 using System.Linq;
 using System.Media;
 using System.Reflection.Metadata;
@@ -13,79 +15,138 @@ namespace discorddb
 {
     public partial class Form1 : Form
     {
+        DateTime starttime;
+        DateTime endtime;
         public Form1()
         {
             InitializeComponent();
+            starttime = DateTime.Now;
+            setdownloadvisibility(false);
+            cB_mode.DropDownStyle = ComboBoxStyle.DropDownList;
         }
 
 
 
         private async void BT_Confirm_Click(object sender, EventArgs e)
         {
-            Debug.WriteLine(TB_SelectedFolder.Text);
-           
-            SQLiteCommand command = DatabaseHelper.ConnectToDatabase(DatabaseHelper.getConnectionString());
-            StringBuilder sB = new StringBuilder();
-
-            int i = 0;
-            int percentage = 0;
-            string[] directories = Directory.GetDirectories(TB_SelectedFolder.Text);
-            for (int j = 0; j < directories.Length; j++)
+            switch (cB_mode.Text)
             {
-
-
-                List<MessageContent> content = readjson(directories[j]);
-                int contentlength = content.Count;
-                int saveinterval = content.Count > 5000 ? content.Count / 10 : content.Count;
-                //string add = "";
-                command.CommandText = "";
-                i = 1;
-                foreach (MessageContent contentItem in content)
-                {
-                    if (command.CommandText == "")
+                case "Search":
+                    if (TB_SelectedFolder.Text != "")
                     {
-                        createinitialstring(command);
+                        setdownloadvisibility(true);
+                        await StartAsync();
+                        endtime = DateTime.Now;
+                        using (StreamWriter sw = File.CreateText(@"..\..\Files\stats.txt"))
+                        {
+                            sw.WriteLine("start: "+starttime);
+                            sw.WriteLine("end: "+endtime);
+                        }
+                        Application.Exit();
+    
                     }
-                    //Create add string (id,content,date,channelId,attachments)
+                    else { MessageBox.Show("no folder selected"); }
+                    break;
 
-                    sB.Append($"(@Id{i}, @Content{i}, @Date{i}, @ChannelId{i},@ChannelType{i}, @Attachments{i})");
-                    if (i % saveinterval == 0 && i != 0)
-                    {
-                        sB.Append(";");
-                    }
-                    else { sB.Append(","); }
+                case "Analysis":
+                    Analysis analysis = new Analysis(DatabaseHelper.getConnectionString());
+                    analysis.Countwords();
+                    break;
 
-                    #region
-                    command.CommandText += sB.ToString();
-                    command.Parameters.AddWithValue($"@Id{i}", contentItem.Id);
-                    command.Parameters.AddWithValue($"@Content{i}", contentItem.Content);
-                    command.Parameters.AddWithValue($"@Date{i}", contentItem.Date);
-                    command.Parameters.AddWithValue($"@ChannelId{i}", contentItem.ChannelId);
-                    command.Parameters.AddWithValue($"@ChannelType{i}", contentItem.ChannelType);
-                    command.Parameters.AddWithValue($"@Attachments{i}", contentItem.Attachments);
-                    sB.Clear();
-                    #endregion
-                    if (i % (Math.Max(saveinterval/10,1)) == 0)
-                    {
-                        percentage = Convert.ToInt32(double.Floor(((double)i / (double)contentlength) * 100));
-                        pB_transfer.Value = percentage;
-
-                    }
-                    if (i % saveinterval == 0 && i != 0 || i == contentlength)
-                    {
-                        percentage = Convert.ToInt32(double.Floor(((double)i / (double)contentlength) * 100));
-                        //Debug.WriteLine($"{i} / {contentlength} = {percentage}");
-                        pB_transfer.Value = percentage;
-
-                        savedata(command);
-                    }
-                    i++;
-                }
-                savedata(command);
-                pB_total.Value = Convert.ToInt32(double.Floor(((double)j / (double)directories.Length)*100));
-                if(cB_sound.Checked) Console.Beep();
-
+                default: MessageBox.Show("Select mode");
+                    break;
+                
             }
+          
+        }
+        
+        private async Task StartAsync()
+        {
+            string folderPath = TB_SelectedFolder.Text;
+            string[] directories = Directory.GetDirectories(folderPath);
+
+            await Task.Run(() =>
+            {
+                SQLiteCommand command = DatabaseHelper.ConnectToDatabase(DatabaseHelper.getConnectionString());
+                StringBuilder sB = new StringBuilder();
+
+                for (int j = 0; j < directories.Length; j++)
+                {
+                    List<MessageContent> content = readjson(directories[j]);
+                    int contentlength = content.Count;
+                    int saveinterval = contentlength > 5000 ? contentlength / 10 : contentlength;
+
+                    int i = 1;
+                    foreach (MessageContent contentItem in content)
+                    {
+                        if (string.IsNullOrWhiteSpace(command.CommandText))
+                        {
+                            createinitialstring(command);
+                        }
+
+                        sB.Append($"(@Id{i}, @Content{i}, @Date{i}, @ChannelId{i},@ChannelType{i}, @Attachments{i})");
+                        if (i % saveinterval == 0 && i != 0)
+                            sB.Append(";");
+                        else
+                            sB.Append(",");
+
+                        command.CommandText += sB.ToString();
+                        command.Parameters.AddWithValue($"@Id{i}", contentItem.Id);
+                        command.Parameters.AddWithValue($"@Content{i}", contentItem.Content);
+                        command.Parameters.AddWithValue($"@Date{i}", contentItem.Date);
+                        command.Parameters.AddWithValue($"@ChannelId{i}", contentItem.ChannelId);
+                        command.Parameters.AddWithValue($"@ChannelType{i}", contentItem.ChannelType);
+                        command.Parameters.AddWithValue($"@Attachments{i}", contentItem.Attachments);
+                        sB.Clear();
+
+                        if (i % Math.Max(saveinterval / 10, 1) == 0)
+                        {
+                            int percent = Convert.ToInt32(((double)i / contentlength) * 100);
+                            UpdateProgressBar(pB_transfer, percent);
+                        }
+
+                        if (i % saveinterval == 0 || i == contentlength)
+                        {
+                            UpdateProgressBar(pB_transfer, Convert.ToInt32(((double)i / contentlength) * 100));
+                            savedata(command);
+                        }
+
+                        i++;
+                    }
+
+                    savedata(command);
+
+                    // Update total progress
+                    int totalPercent = Convert.ToInt32(((double)j / directories.Length) * 100);
+                    UpdateProgressBar(pB_total, totalPercent);
+
+                    if (cB_sound.Checked)
+                        Console.Beep();
+                }
+            });
+        }
+        public void setdownloadvisibility(bool b)
+        {
+
+            cB_sound.Visible = b;
+            pB_transfer.Visible = b;
+            pB_total.Visible = b;
+            lb_pb.Visible = b;
+        }
+        private void UpdateProgressBar(ProgressBar bar, int value)
+        {
+            if(cB_progress.Checked)
+            {
+                if (bar.InvokeRequired)
+                {
+                    bar.Invoke(() => bar.Value = Math.Min(bar.Maximum, value));
+                }
+                else
+                {
+                    bar.Value = Math.Min(bar.Maximum, value);
+                }
+            }
+           
         }
 
         private void savedata(SQLiteCommand command)
@@ -100,7 +161,6 @@ namespace discorddb
             //Debug.WriteLine(command.CommandText);
             //Clipboard.SetText(command.CommandText);
             command.Prepare();
-            
             DatabaseHelper.UpdateDatabase(command);
             command.CommandText = "";
         }
@@ -111,6 +171,7 @@ namespace discorddb
                 INSERT OR IGNORE INTO Message (Id,Content,Date,ChannelId,ChannelType,Attachments)  
                 VALUES
             ";
+            
         }
 
         private List<MessageContent> readjson(string dir)
@@ -161,6 +222,11 @@ namespace discorddb
                 TB_SelectedFolder.Text = dialog.SelectedPath;
             }
             else { TB_SelectedFolder.Text = ""; }
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+
         }
     }
 }
